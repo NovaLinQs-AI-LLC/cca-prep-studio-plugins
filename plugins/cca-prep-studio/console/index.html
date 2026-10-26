@@ -64,8 +64,18 @@
   .line.err { background: rgba(255,107,107,0.10); border: 1px solid rgba(255,107,107,0.35); }
   .line.hook { background: rgba(255,201,79,0.08); border: 1px solid rgba(255,201,79,0.35); }
   .tag { flex: none; font-size: 11px; color: var(--muted); border: 1px solid rgba(255,255,255,0.2); border-radius: 999px; padding: 1px 7px; }
+  details.req { border-radius: 10px; background: rgba(140,168,255,0.08); border: 1px solid rgba(140,168,255,0.28); font-size: 12px; }
+  details.req summary { list-style: none; cursor: pointer; display: flex; gap: 10px; align-items: flex-start; padding: 7px 12px; }
+  details.req summary::-webkit-details-marker { display: none; }
+  details.req summary .v { font-family: inherit; font-size: 13px; }
+  details.req[open] summary .more::before { content: "Hide"; } details.req summary .more::before { content: "Show"; }
+  details.req .more { flex: none; font-weight: 700; color: var(--blue); }
+  .msglist { padding: 2px 12px 10px 86px; display: flex; flex-direction: column; gap: 4px; }
+  .msg { font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; } .msg .role { font-weight: 700; }
+  .msg.new { color: var(--yellow); }
+  .sys { font-family: var(--mono); font-size: 11px; white-space: pre-wrap; color: var(--muted); margin-top: 4px; max-height: 140px; overflow: auto; border-top: 1px solid var(--hair); padding-top: 6px; }
   .note { font-size: 13px; color: var(--muted); text-align: center; padding: 4px; }
-  .hidebts .line { display: none; }
+  .hidebts .line, .hidebts details.req { display: none; }
   .composer { display: flex; gap: 10px; padding: 14px 16px; border-top: 1px solid var(--hair); }
   .composer textarea { flex: 1; resize: none; height: 46px; padding: 12px 14px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.06); color: var(--ink); font: inherit; }
   .composer textarea:disabled { opacity: .6; }
@@ -77,7 +87,8 @@
   .add { display: none; gap: 6px; flex-direction: column; margin-top: 8px; } .add.on { display: flex; }
   .add input { padding: 7px 10px; font: inherit; font-size: 13px; }
   .card { position: absolute; right: 18px; bottom: 86px; width: min(420px, calc(100% - 36px)); padding: 18px 20px; border-radius: 20px; background: rgba(30,25,22,0.98); border: 1px solid rgba(255,143,10,0.6); box-shadow: 0 18px 40px rgba(0,0,0,.5); display: none; z-index: 5; max-height: calc(100% - 120px); overflow-y: auto; }
-  .card.on { display: block; } .card.bad { border-color: rgba(255,107,107,0.7); } .card.bad .eyebrow { color: var(--red); }
+  .card.on { display: block; } .card .grab { cursor: grab; user-select: none; } .card.dragging .grab { cursor: grabbing; }
+  .card .handle { width: 36px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.25); margin: -8px auto 10px; } .card.bad { border-color: rgba(255,107,107,0.7); } .card.bad .eyebrow { color: var(--red); }
   .card h3 { margin: 6px 0; font-size: 18px; line-height: 1.3; } .card p { margin: 6px 0; font-size: 14px; }
   .card .refs { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
   .ref { font-family: var(--mono); font-size: 12px; color: var(--yellow); text-decoration: none; } .ref:hover { text-decoration: underline; }
@@ -230,8 +241,7 @@ function renderMode() {
   const live = STATE.mode === "live";
   $("#m-practice").classList.toggle("on", !live);
   $("#m-live").classList.toggle("on", live);
-  $("#m-live").disabled = !STATE.hasKey;
-  $("#m-live").title = STATE.hasKey ? "" : "Add ANTHROPIC_API_KEY to your project's .env file to use Live mode.";
+  $("#m-live").title = STATE.hasKey ? "" : "Live needs your Anthropic API key. Click to see how to add it.";
   $("#input").disabled = !live || busy;
   $("#send").disabled = !live || busy;
   $("#input").placeholder = live ? "Message support as the customer. Enter to send." : "Practice: pick a prompt on the left. Switch to Live to type your own.";
@@ -240,20 +250,34 @@ function renderMode() {
   b.textContent = STATE.stale ? "Your code changed. The next message starts a fresh conversation with it." : "Checking which steps are built…";
 }
 
-const LABEL = { call: ["TOOL CALL", "var(--blue)"], result: ["RESULT", "var(--green)"], error: ["ERROR", "var(--red)"], hook: ["HOOK", "var(--yellow)"], handoff: ["TO A PERSON", "var(--yellow)"], backend_fail: ["BACKEND", "var(--red)"], model: ["CLAUDE", "var(--muted)"], broke: ["BROKEN", "var(--yellow)"] };
+const LABEL = { call: ["TOOL CALL", "var(--blue)"], result: ["RESULT", "var(--green)"], error: ["ERROR", "var(--red)"], hook: ["HOOK", "var(--yellow)"], handoff: ["TO A PERSON", "var(--yellow)"], backend_fail: ["BACKEND", "var(--red)"], model: ["CLAUDE REPLIED", "var(--muted)"], broke: ["BROKEN", "var(--yellow)"] };
 function lineHtml(e) {
   let v = "", cls = "", tag = "";
   if (e.type === "call") { v = `${e.name} ${JSON.stringify(e.input)}`; }
   else if (e.type === "result") { v = e.content; }
-  else if (e.type === "error") { v = e.content; cls = "err"; tag = e.data && e.data.errorCategory ? "Step 3" : ""; }
-  else if (e.type === "hook") { v = `${e.hook} stopped ${e.tool}: ${e.reason}`; cls = "hook"; tag = "Step 4"; }
-  else if (e.type === "handoff") { v = JSON.stringify(e.ticket); cls = "hook"; tag = "Step 5"; }
+  else if (e.type === "error") { v = e.content; cls = "err"; tag = e.data && e.data.errorCategory ? "built in step 3" : ""; }
+  else if (e.type === "hook") { v = `${e.hook} stopped ${e.tool}: ${e.reason}`; cls = "hook"; tag = "built in step 4"; }
+  else if (e.type === "handoff") { v = JSON.stringify(e.ticket); cls = "hook"; tag = "built in step 5"; }
   else if (e.type === "backend_fail") { v = `${e.op}: ${e.message}`; cls = "err"; }
-  else if (e.type === "model") { v = `stop_reason: ${e.stop_reason}${e.asks.length ? " · asks for " + e.asks.join(", ") : ""}${e.text && e.asks.length ? ` · also wrote "${e.text}"` : ""}`; tag = "Step 1"; }
+  else if (e.type === "model") { v = `round ${e.n} · stop_reason: ${e.stop_reason}${e.asks.length ? " · asks for " + e.asks.join(", ") + " → your loop runs " + (e.asks.length > 1 ? "them" : "it") + " and goes again" : " → your loop stops here"}${e.text && e.asks.length ? `\nalso wrote: "${e.text}"` : ""}`; tag = "your loop · step 1"; }
   else if (e.type === "broke") { v = `the next ${e.op} call${e.times > 1 ? "s" : ""} will ${e.kind === "timeout" ? "time out" : "be denied"}${e.times > 1 ? " (" + e.times + "×)" : ""}`; }
+  else if (e.type === "request") return requestHtml(e);
   else return "";
   const [k, color] = LABEL[e.type];
   return `<div class="line ${cls}"><span class="k" style="color:${color}">${k}</span><span class="v">${esc(v)}</span>${tag ? `<span class="tag">${tag}</span>` : ""}</div>`;
+}
+function blockText(b) {
+  if (b.type === "text") return `text "${b.text}"`;
+  if (b.type === "tool_use") return `tool_use ${b.name} ${JSON.stringify(b.input || {})}  (id ${b.id})`;
+  if (b.type === "tool_result") return `tool_result for ${b.id}${b.is_error ? " · is_error" : ""}: ${b.content}`;
+  return b.type;
+}
+function requestHtml(e) {
+  const roles = e.messages.map((m) => m.role).join(" · ");
+  const fresh = e.n === 1 ? 1 : 2; // the newest messages this round: Claude's last reply and your tool results
+  const list = e.messages.map((m, i) => `<div class="msg ${i >= e.messages.length - fresh && e.n > 1 ? "new" : ""}"><span class="role">${i + 1}. ${esc(m.role)}</span> ${esc(m.blocks.map(blockText).join(" + "))}</div>`).join("");
+  return `<details class="req line-req"><summary><span class="k" style="color:var(--blue);font-size:11px;font-weight:700;min-width:64px">REQUEST ${e.n}</span><span class="v" style="flex:1">Claude receives ${e.count} message${e.count === 1 ? "" : "s"} (${esc(roles)}), the system prompt and ${e.tools.length} tools.${e.n > 1 ? " The last two are new: its own tool request and your results, appended by your loop." : ""}</span><span class="more"></span></summary>
+    <div class="msglist">${list}${e.count > e.messages.length ? `<div class="tiny">Showing the last ${e.messages.length} of ${e.count}.</div>` : ""}<div class="sys"><b>System prompt</b>\n${esc(e.system)}</div><div class="tiny">Tools: ${esc(e.tools.join(", "))}</div></div></details>`;
 }
 function renderMsgs() {
   const box = $("#msgs");
@@ -284,17 +308,44 @@ function showCard(c, { byClaude = false } = {}) {
   const tasks = (c.tasks || []).join(" and ");
   const refs = (c.lookAt || []).map((r) => refHtml(r.ref, r.what)).concat((c.refs || []).map((r) => refHtml(r)));
   card.innerHTML = `
-    <div class="row"><div class="eyebrow ${bad ? "" : "y"}" style="flex:1">What just happened${c.step ? " · step " + esc(c.step) : ""}${tasks ? " · task" + ((c.tasks || []).length > 1 ? "s " : " ") + esc(tasks) : ""}</div><button class="link" id="card-x" aria-label="Close" style="color:var(--muted)">✕</button></div>
-    <h3>${esc(c.title)}</h3><p>${esc(c.body)}</p>${c.lesson ? `<p class="yellow">${esc(c.lesson)}</p>` : ""}
+    <div class="grab" title="Drag to move"><div class="handle"></div><div class="row"><div class="eyebrow ${bad ? "" : "y"}" style="flex:1">${c.eyebrow ? esc(c.eyebrow) : "What just happened"}${c.step ? " · step " + esc(c.step) : ""}${tasks ? " · task" + ((c.tasks || []).length > 1 ? "s " : " ") + esc(tasks) : ""}</div><button class="link" id="card-x" aria-label="Close" style="color:var(--muted)">✕</button></div></div>
+    <h3>${esc(c.title)}</h3>${c.body ? `<p>${esc(c.body)}</p>` : ""}${c.steps ? `<ol style="margin:6px 0;padding-left:20px;font-size:14px">${c.steps.map((x) => `<li style="margin:4px 0">${esc(x)}</li>`).join("")}</ol>` : ""}${c.lesson ? `<p class="yellow">${esc(c.lesson)}</p>` : ""}
     ${refs.length ? `<div class="refs"><span class="tiny"><b>Look at</b> (opens in VS Code)</span>${refs.join("")}</div>` : ""}
     <div class="foot"><span class="grow">${byClaude ? "Explained by Claude from this conversation and the study notes." : ""}</span><button class="btn primary" id="card-ok">Got it</button></div>`;
   $("#card-x").onclick = $("#card-ok").onclick = () => card.classList.remove("on");
+  placeCard();
 }
+// The card can be dragged anywhere in the window by its top bar; it remembers where.
+function placeCard() {
+  const card = $("#card");
+  let pos = null;
+  try { pos = JSON.parse(localStorage.getItem("console-card-pos") || "null"); } catch {}
+  if (pos && pos.x >= 0 && pos.y >= 0 && pos.x < innerWidth - 80 && pos.y < innerHeight - 60) {
+    Object.assign(card.style, { position: "fixed", left: pos.x + "px", top: pos.y + "px", right: "auto", bottom: "auto" });
+  }
+}
+document.addEventListener("pointerdown", (e) => {
+  const grab = e.target.closest("#card .grab");
+  if (!grab || e.target.closest("button")) return;
+  const card = $("#card"), r = card.getBoundingClientRect(), dx = e.clientX - r.left, dy = e.clientY - r.top;
+  card.classList.add("dragging");
+  const move = (ev) => {
+    const x = Math.max(0, Math.min(innerWidth - r.width, ev.clientX - dx)), y = Math.max(0, Math.min(innerHeight - 60, ev.clientY - dy));
+    Object.assign(card.style, { position: "fixed", left: x + "px", top: y + "px", right: "auto", bottom: "auto" });
+  };
+  const up = () => {
+    card.classList.remove("dragging");
+    removeEventListener("pointermove", move); removeEventListener("pointerup", up);
+    try { localStorage.setItem("console-card-pos", JSON.stringify({ x: parseInt(card.style.left), y: parseInt(card.style.top) })); } catch {}
+  };
+  addEventListener("pointermove", move); addEventListener("pointerup", up);
+  e.preventDefault();
+});
 
 async function run(fn) {
   if (busy) return;
   busy = true; renderMode();
-  try { await fn(); } catch (e) { showCard({ title: "That didn't work", body: e.message }); }
+  try { await fn(); } catch (e) { showCard({ eyebrow: "Something went wrong", title: "That didn't work", body: e.message }); }
   finally { busy = false; await poll(); }
 }
 async function sendTry(id) {
@@ -376,7 +427,14 @@ document.addEventListener("click", (e) => {
 $("#scrim").onclick = closeDrawer;
 $("#step").onchange = (e) => { step = Number(e.target.value); renderTries(); };
 $("#m-practice").onclick = () => run(async () => { await api("/api/mode", { mode: "practice" }); turns = []; renderMsgs(); showCard(null); });
-$("#m-live").onclick = () => run(async () => { await api("/api/mode", { mode: "live" }); turns = []; renderMsgs(); showCard(null); });
+$("#m-live").onclick = () => run(async () => {
+  try { await api("/api/mode", { mode: "live" }); }
+  catch (e) {
+    if (e.message !== "no_key") throw e;
+    return showCard({ eyebrow: "Live mode", title: "Live needs your Anthropic API key", body: "Practice works without one. Live calls Claude with your own key, billed to your Anthropic account.", steps: ["Create a key in the Claude Console: Settings › API keys.", "In your project, copy .env.example to .env (it's already kept out of git).", "Open .env in your editor, paste the key right after ANTHROPIC_API_KEY= and save. Never paste a key into a chat.", "Click Live again. Or run /cca-prep-studio:console live in Claude Code and Claude walks you through it."] });
+  }
+  turns = []; renderMsgs(); showCard(null);
+});
 $("#reset").onclick = () => run(async () => { await api("/api/reset", { mode: STATE?.mode }); turns = []; renderMsgs(); showCard(null); });
 $("#run-tests").onclick = runTests;
 $("#send").onclick = sendText;

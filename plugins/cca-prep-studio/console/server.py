@@ -147,6 +147,30 @@ def plain_failure(msg: str) -> str:
 
 # --- one conversation ------------------------------------------------------------
 
+def _get(b: Any, key: str) -> Any:
+    return b.get(key) if isinstance(b, dict) else getattr(b, key, None)
+
+
+def summarize_message(m: Any) -> dict[str, Any]:
+    """One message as the learner should see it: who sent it and what blocks it holds."""
+    content = _get(m, "content")
+    blocks: list[dict[str, Any]] = []
+    if isinstance(content, str):
+        blocks.append({"type": "text", "text": content[:160]})
+    else:
+        for b in content or []:
+            t = _get(b, "type")
+            if t == "text":
+                blocks.append({"type": "text", "text": str(_get(b, "text") or "")[:160]})
+            elif t == "tool_use":
+                blocks.append({"type": "tool_use", "name": _get(b, "name"), "id": _get(b, "id"), "input": _get(b, "input")})
+            elif t == "tool_result":
+                blocks.append({"type": "tool_result", "id": _get(b, "tool_use_id"), "is_error": bool(_get(b, "is_error")), "content": str(_get(b, "content") or "")[:160]})
+            else:
+                blocks.append({"type": str(t)})
+    return {"role": _get(m, "role"), "blocks": blocks}
+
+
 class ClientProxy:
     """Stands where the Anthropic client goes, so each request is recorded and Practice can swap in its stand-in."""
 
@@ -158,11 +182,15 @@ class ClientProxy:
     def create(self, **kwargs: Any) -> Any:
         if self.target is None:
             raise RuntimeError("No Claude to call: switch to Live with an API key, or pick a Try this prompt.")
+        # What Claude receives on this round: the whole conversation so far, the system prompt and the tools.
+        msgs = kwargs.get("messages") or []
+        self.session.round += 1
+        self.session.emit({"type": "request", "n": self.session.round, "messages": [summarize_message(m) for m in msgs][-40:], "count": len(msgs), "system": str(kwargs.get("system", ""))[:2000], "tools": [t.get("name") for t in kwargs.get("tools") or []]})
         r = self.target.messages.create(**kwargs)
         blocks = list(getattr(r, "content", []) or [])
         said = " ".join(getattr(b, "text", "") for b in blocks if getattr(b, "type", "") == "text").strip()
         asks = [getattr(b, "name", "") for b in blocks if getattr(b, "type", "") == "tool_use"]
-        self.session.emit({"type": "model", "stop_reason": getattr(r, "stop_reason", None), "text": said[:400], "asks": asks})
+        self.session.emit({"type": "model", "n": self.session.round, "stop_reason": getattr(r, "stop_reason", None), "text": said[:400], "asks": asks})
         return r
 
 
@@ -178,6 +206,7 @@ class Session:
         self.turns: list[dict[str, Any]] = []
         self.current: list[dict[str, Any]] | None = None
         self.pending_breaks: list[list[Any]] = []
+        self.round = 0
         self._instrument()
 
     def emit(self, event: dict[str, Any]) -> None:
@@ -233,6 +262,7 @@ class Session:
     def send(self, text: str, try_id: str | None = None) -> dict[str, Any]:
         events: list[dict[str, Any]] = []
         self.current = events
+        self.round = 0
         for op, kind, times in self.pending_breaks:
             self.backend.fail_next(op, kind, times)
             events.append({"type": "broke", "op": op, "kind": kind, "times": times})
@@ -277,6 +307,7 @@ class Session:
         for i in range(12):
             self.agent.handle(["Thanks!", "One more question.", "How long do refunds take?", "Do you ship abroad?", "OK.", "Great."][i % 6])
         del events[:]
+        self.round = 0
         events.append({"type": "note", "text": "13 earlier turns: the headphones refund and laptop question, then small talk."})
 
     def snapshot(self) -> dict[str, Any]:
@@ -548,7 +579,9 @@ class Handler(BaseHTTPRequestHandler):
                 if mode not in ("practice", "live"):
                     return self._json({"error": "unknown mode"}, 400)
                 if mode == "live" and not os.environ.get("ANTHROPIC_API_KEY"):
-                    return self._json({"error": "Live mode needs ANTHROPIC_API_KEY in your project's .env file."}, 400)
+                    project._load_env()  # the learner may have just added the key to .env
+                if mode == "live" and not os.environ.get("ANTHROPIC_API_KEY"):
+                    return self._json({"error": "no_key"}, 400)
                 STATE["session"] = Session(project, mode)
                 return self._json({"ok": True})
             if self.path == "/api/send":
