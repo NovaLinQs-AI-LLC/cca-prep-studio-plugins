@@ -10,6 +10,16 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/edit_reminder.py\"",
+            "timeout": 10
+          }
+        ]
       }
     ]
   }
