@@ -1,0 +1,12 @@
+{
+  "name": "cca-prep-studio",
+  "description": "Capstone coaching for CCA Prep Studio learners preparing for the Claude Certified Architect – Foundations exam.",
+  "owner": { "name": "NovaLinQs" },
+  "plugins": [
+    {
+      "name": "cca-prep-studio",
+      "source": "./plugins/cca-prep-studio",
+      "description": "Coaches you through a CCA Prep Studio capstone one step at a time and reports finished steps to your Workbook."
+    }
+  ]
+}
