@@ -3,7 +3,7 @@
 The plugin that coaches you through a CCA Prep Studio capstone.
 
 ```bash
-claude plugin marketplace add NovaLinQs/cca-prep-studio-plugins
+claude plugin marketplace add NovaLinQs-AI-LLC/cca-prep-studio-plugins
 claude plugin install cca-prep-studio@cca-prep-studio
 ```
 
