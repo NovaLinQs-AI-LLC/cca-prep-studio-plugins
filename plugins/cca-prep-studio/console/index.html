@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Support Console · CCA Prep Studio</title>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --bg: #0a0806; --panel: rgba(255,255,255,0.06); --hair: rgba(255,255,255,0.12); --stroke: rgba(255,255,255,0.14);
+    --ink: #f2f6ff; --muted: rgba(226,236,255,0.74); --dim: rgba(226,236,255,0.55);
+    --yellow: #ffc94f; --orange: #ff8f0a; --green: #38c98a; --red: #ff6b6b; --blue: #8ca8ff;
+    --mono: ui-monospace, "JetBrains Mono", SFMono-Regular, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg); color: var(--ink); font: 15px/1.45 Lato, -apple-system, "Segoe UI", system-ui, sans-serif; overflow: hidden; }
+  body::before { content: ""; position: fixed; inset: -20%; pointer-events: none; z-index: -1;
+    background: radial-gradient(40% 40% at 10% 5%, rgba(255,143,10,0.18), transparent 70%), radial-gradient(40% 40% at 95% 95%, rgba(69,112,245,0.16), transparent 70%); }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .app { height: 100vh; display: grid; grid-template-rows: auto 1fr; gap: 14px; padding: 18px 20px; }
+  .top { display: flex; align-items: center; gap: 14px; padding: 10px 16px; border: 1px solid var(--stroke); border-radius: 16px; background: var(--panel); }
+  .logo { width: 26px; height: 26px; border-radius: 8px; background: linear-gradient(135deg, #ff6e1a, #ffc840); flex: none; }
+  .brand b { display: block; font-size: 16px; } .brand span { font-size: 12px; color: var(--muted); }
+  .grow { flex: 1; }
+  select, .seg, .btn, input { border: 1px solid var(--stroke); background: rgba(255,255,255,0.06); border-radius: 10px; color: var(--ink); }
+  select { font: inherit; font-size: 13px; font-weight: 700; padding: 7px 10px; }
+  .seg { display: inline-flex; overflow: hidden; }
+  .seg button { border: 0; background: none; padding: 7px 12px; font-size: 13px; color: var(--muted); }
+  .seg button.on { background: rgba(255,143,10,0.22); color: var(--yellow); font-weight: 700; }
+  .seg button:disabled { opacity: .45; cursor: not-allowed; }
+  .btn { padding: 8px 16px; border-radius: 999px; font-size: 13px; font-weight: 700; white-space: nowrap; }
+  .btn:hover { background: rgba(255,255,255,0.1); }
+  .btn.primary { background: var(--orange); border-color: var(--orange); color: #140f0a; }
+  .btn.primary:disabled { opacity: .45; cursor: not-allowed; }
+  .cols { display: grid; grid-template-columns: 320px minmax(0,1fr) 340px; gap: 14px; min-height: 0; }
+  .panel { border: 1px solid var(--stroke); border-radius: 20px; background: var(--panel); display: flex; flex-direction: column; min-height: 0; overflow: hidden; position: relative; }
+  .sec { padding: 14px 20px; border-top: 1px solid var(--hair); }
+  .sec:first-child { border-top: 0; }
+  .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+  .eyebrow.y { color: var(--yellow); }
+  .small { font-size: 13px; color: var(--muted); }
+  .tiny { font-size: 12px; color: var(--muted); }
+  .scroll { overflow-y: auto; min-height: 0; flex: 1; }
+  .try { display: block; width: 100%; text-align: left; border: 0; border-top: 1px solid var(--hair); background: none; padding: 12px 20px; }
+  .try:hover { background: rgba(255,255,255,0.04); }
+  .try.on { background: rgba(255,143,10,0.10); }
+  .try .t { display: flex; gap: 8px; align-items: baseline; } .try .t b { flex: 1; font-size: 15px; }
+  .try .go { font-size: 13px; font-weight: 700; color: var(--yellow); } .try.on .go { color: var(--green); }
+  .try .p { font-size: 13px; margin-top: 3px; } .try .e { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .try:disabled { opacity: .5; cursor: not-allowed; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .chat-head { display: flex; align-items: center; gap: 8px; padding: 14px 20px; border-bottom: 1px solid var(--hair); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex: none; }
+  .msgs { padding: 16px 20px; display: flex; flex-direction: column; gap: 8px; }
+  .bubble { max-width: 78%; padding: 10px 14px; border-radius: 14px; border: 1px solid var(--hair); background: rgba(255,255,255,0.07); white-space: pre-wrap; }
+  .bubble.me { align-self: flex-end; background: rgba(255,143,10,0.18); }
+  .bubble .who { font-size: 11px; font-weight: 700; letter-spacing: .04em; color: var(--muted); display: block; margin-bottom: 2px; }
+  .bubble.me .who { color: var(--yellow); }
+  .why { align-self: flex-start; border: 0; background: none; font-size: 13px; font-weight: 700; color: var(--yellow); padding: 0 4px; }
+  .line { display: flex; gap: 10px; align-items: flex-start; padding: 7px 12px; border-radius: 10px; background: rgba(0,0,0,0.25); font-size: 12px; }
+  .line .k { font-size: 11px; font-weight: 700; flex: none; padding-top: 1px; min-width: 64px; }
+  .line .v { font-family: var(--mono); flex: 1; overflow-wrap: anywhere; white-space: pre-wrap; opacity: .92; }
+  .line.err { background: rgba(255,107,107,0.10); border: 1px solid rgba(255,107,107,0.35); }
+  .line.hook { background: rgba(255,201,79,0.08); border: 1px solid rgba(255,201,79,0.35); }
+  .tag { flex: none; font-size: 11px; color: var(--muted); border: 1px solid rgba(255,255,255,0.2); border-radius: 999px; padding: 1px 7px; }
+  .note { font-size: 13px; color: var(--muted); text-align: center; padding: 4px; }
+  .hidebts .line { display: none; }
+  .composer { display: flex; gap: 10px; padding: 14px 16px; border-top: 1px solid var(--hair); }
+  .composer textarea { flex: 1; resize: none; height: 46px; padding: 12px 14px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.06); color: var(--ink); font: inherit; }
+  .composer textarea:disabled { opacity: .6; }
+  .kv { display: flex; gap: 8px; font-size: 14px; } .kv span:first-child { flex: 1; } .kv .m { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .list { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
+  .red { color: var(--red); } .green { color: var(--green); } .yellow { color: var(--yellow); }
+  pre.facts { font-family: var(--mono); font-size: 12px; white-space: pre-wrap; margin: 8px 0 0; color: var(--ink); opacity: .9; }
+  .link { border: 0; background: none; padding: 0; font-size: 13px; font-weight: 700; color: var(--yellow); }
+  .add { display: none; gap: 6px; flex-direction: column; margin-top: 8px; } .add.on { display: flex; }
+  .add input { padding: 7px 10px; font: inherit; font-size: 13px; }
+  .card { position: absolute; right: 18px; bottom: 86px; width: min(420px, calc(100% - 36px)); padding: 18px 20px; border-radius: 20px; background: rgba(30,25,22,0.98); border: 1px solid rgba(255,143,10,0.6); box-shadow: 0 18px 40px rgba(0,0,0,.5); display: none; z-index: 5; max-height: calc(100% - 120px); overflow-y: auto; }
+  .card.on { display: block; } .card.bad { border-color: rgba(255,107,107,0.7); } .card.bad .eyebrow { color: var(--red); }
+  .card h3 { margin: 6px 0; font-size: 18px; line-height: 1.3; } .card p { margin: 6px 0; font-size: 14px; }
+  .card .refs { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+  .ref { font-family: var(--mono); font-size: 12px; color: var(--yellow); text-decoration: none; } .ref:hover { text-decoration: underline; }
+  .card .foot { display: flex; align-items: center; gap: 10px; margin-top: 12px; } .card .foot .grow { font-size: 12px; color: var(--muted); }
+  .drawer-scrim { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: none; z-index: 10; } .drawer-scrim.on { display: block; }
+  .drawer { position: fixed; top: 18px; right: 18px; bottom: 18px; width: min(560px, calc(100vw - 36px)); border-radius: 22px; background: rgba(26,23,21,0.98); border: 1px solid rgba(255,255,255,0.16); display: none; flex-direction: column; z-index: 11; box-shadow: 0 20px 50px rgba(0,0,0,.5); }
+  .drawer.on { display: flex; }
+  .drawer h2 { margin: 4px 0; font-size: 26px; font-weight: 300; }
+  .test { padding: 12px 26px; border-top: 1px solid var(--hair); }
+  .test.fail { background: rgba(255,107,107,0.06); }
+  .test .h { display: flex; gap: 10px; align-items: center; } .test .h b { flex: 1; font-weight: 400; } .test.fail .h b { font-weight: 700; }
+  .test .d { padding-left: 19px; margin-top: 6px; } .test .d div { margin-top: 6px; } .test .d .tiny { font-weight: 700; }
+  .ask { display: flex; gap: 10px; align-items: center; padding: 9px 12px; border-radius: 12px; border: 1px solid var(--stroke); background: rgba(255,255,255,0.06); font-size: 14px; margin-top: 4px; }
+  .ask span { flex: 1; }
+  .banner { padding: 8px 20px; font-size: 13px; color: var(--yellow); background: rgba(255,201,79,0.08); border-bottom: 1px solid var(--hair); display: none; }
+  .banner.on { display: block; }
+  .tooldesc { padding: 12px 26px; border-top: 1px solid var(--hair); } .tooldesc .m { font-family: var(--mono); font-size: 13px; color: var(--yellow); }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; } .chip { font-size: 12px; border: 1px solid var(--stroke); border-radius: 999px; padding: 1px 8px; }
+  .chip.ok { color: var(--green); border-color: rgba(56,201,138,.5); } .chip.no { color: var(--red); border-color: rgba(255,107,107,.5); }
+  @media (max-width: 1180px) { .cols { grid-template-columns: 280px minmax(0,1fr); } .cols > .panel:last-child { display: none; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="logo" aria-hidden="true"></div>
+    <div class="brand"><b>Support Console</b><span>CCA Prep Studio · Customer Support agent</span></div>
+    <div class="grow"></div>
+    <select id="step" aria-label="Step"></select>
+    <div class="seg" role="group" aria-label="Mode">
+      <button id="m-practice" class="on">Practice</button>
+      <button id="m-live">Live · your API key</button>
+    </div>
+    <button class="btn" id="run-tests">Run tests</button>
+    <button class="btn" id="reset">New conversation</button>
+  </header>
+  <div class="cols">
+    <aside class="panel" aria-label="Try this">
+      <div class="sec"><div class="eyebrow y" id="try-title">Try this</div><div class="small" id="try-intro" style="margin-top:4px"></div></div>
+      <div class="scroll" id="tries"></div>
+      <div class="sec">
+        <div class="eyebrow">Break something</div>
+        <select id="break-op" aria-label="Tool" style="width:100%;margin-top:8px;font-family:var(--mono);font-weight:400">
+          <option>lookup_order</option><option>get_customer</option><option>process_refund</option><option>escalate_to_human</option>
+        </select>
+        <div class="row" style="margin-top:8px">
+          <button class="btn" data-break="timeout" style="flex:1">Time out next call</button>
+          <button class="btn" data-break="denied" style="flex:1">Deny next call</button>
+        </div>
+        <div class="tiny" id="break-note" style="margin-top:6px">The next call to this tool fails on purpose, so you can see how your agent copes.</div>
+      </div>
+    </aside>
+    <main class="panel" aria-label="Customer chat">
+      <div class="chat-head"><span class="dot"></span><b style="flex:1">Customer chat</b>
+        <label class="small row" style="cursor:pointer"><input type="checkbox" id="bts" checked> Behind the scenes</label></div>
+      <div class="banner" id="banner"></div>
+      <div class="scroll"><div class="msgs" id="msgs"></div></div>
+      <div class="composer">
+        <textarea id="input" placeholder="Practice: pick a prompt on the left. Switch to Live to type your own." disabled></textarea>
+        <button class="btn primary" id="send" disabled>Send</button>
+      </div>
+      <div class="card" id="card" role="dialog" aria-live="polite"></div>
+    </main>
+    <aside class="panel" aria-label="Company data">
+      <div class="sec"><div class="eyebrow">Northwind · pretend company data</div><div class="small" style="margin-top:4px">What only code can see. Nothing here is real.</div></div>
+      <div class="scroll" id="data"></div>
+      <div class="sec tiny">Runs on your computer only (127.0.0.1). Live mode calls Claude with your key.</div>
+    </aside>
+  </div>
+</div>
+<div class="drawer-scrim" id="scrim"></div>
+<section class="drawer" id="drawer" aria-label="Tests"></section>
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+let CONTENT = { steps: [] }, STATE = null, step = null, turns = [], busy = false;
+
+async function api(path, body) {
+  const res = await fetch(path, body === undefined ? {} : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  const j = await res.json().catch(() => ({ error: "No answer from the console." }));
+  if (!res.ok || j.error) throw new Error(j.error || "Something went wrong.");
+  return j;
+}
+const editorLink = (ref) => {
+  if (!ref || !STATE) return "";
+  const [file, line] = ref.split(":");
+  return `vscode://file/${encodeURI(STATE.root + "/" + file)}:${line || 1}`;
+};
+const refHtml = (ref, what) => `<a class="ref" href="${esc(editorLink(ref))}" title="Open in your editor">${esc(ref)}</a>${what ? ` <span class="tiny">${esc(what)}</span>` : ""}`;
+
+let stepsKey = "";
+function renderSteps() {
+  const sel = $("#step");
+  const key = JSON.stringify(STATE && STATE.built) + step;
+  if (key === stepsKey) return;
+  stepsKey = key;
+  sel.innerHTML = CONTENT.steps.map((s) => {
+    const b = STATE && STATE.built[s.n];
+    return `<option value="${s.n}">Step ${s.n} of 6 · ${esc(s.title)}${b === true ? "  ✓ built" : ""}</option>`;
+  }).join("");
+  sel.value = String(step);
+}
+function renderTries() {
+  const s = CONTENT.steps.find((x) => x.n === step);
+  if (!s) return;
+  $("#try-title").textContent = `Try this · step ${s.n}`;
+  const built = STATE && STATE.built[s.n];
+  $("#try-intro").textContent = `Send these as the customer. Each says what to expect ${built ? "now that step " + s.n + " is built" : "before and after you build step " + s.n}.`;
+  const live = STATE && STATE.mode === "live";
+  $("#tries").innerHTML = s.tries.map((t) => `
+    <button class="try" data-try="${t.id}" ${t.live && !live ? "disabled title='Needs Live mode'" : ""}>
+      <div class="t"><b>${esc(t.title)}</b><span class="go">${t.action ? "Open" : "Send"}</span></div>
+      <div class="p">${esc(t.prompt)}</div>
+      ${t.break ? `<div class="e yellow">Breaks ${esc(t.break[0])} first (${esc(t.break[1])}${t.break[2] > 1 ? " ×" + t.break[2] : ""}).</div>` : ""}
+      <div class="e">${esc(t.expect)}</div>
+    </button>`).join("");
+}
+function money(n) { return "$" + Number(n).toFixed(2); }
+function renderData() {
+  if (!STATE) return;
+  // Don't redraw under someone typing in the add-customer form.
+  if ($("#data").contains(document.activeElement) && document.activeElement.tagName === "INPUT") return;
+  const d = STATE.data;
+  const byId = Object.fromEntries(d.customers.map((c) => [c.id, c]));
+  const verified = d.verified.map((id) => byId[id] ? `${byId[id].name} · ${id}` : id);
+  $("#data").innerHTML = `
+    <div class="sec"><div class="eyebrow">Verified customer</div>
+      <div style="margin-top:6px">${verified.length ? verified.map((v) => `<div class="row"><span class="dot"></span><b>${esc(v)}</b></div>`).join("") : '<span class="small">Nobody yet</span>'}</div></div>
+    <div class="sec"><div class="eyebrow">Customers</div><div class="list">
+      ${d.customers.map((c) => `<div class="kv"><span>${esc(c.name)}</span><span class="m">${esc(c.email)}</span></div>`).join("")}</div>
+      <button class="link" id="add-btn" style="margin-top:6px">+ Add a test customer</button>
+      <form class="add" id="add-form"><input name="name" placeholder="Name" required><input name="email" placeholder="email@example.com" required><button class="btn">Add</button></form></div>
+    <div class="sec"><div class="eyebrow">Orders</div><div class="list">
+      ${d.orders.map((o) => `<div class="kv"><span class="m" style="flex:none">${esc(o.id)}</span><span>${esc(o.item)}</span><span>${money(o.amount)}</span><span class="tiny ${o.status === "shipped" ? "yellow" : ""}">${esc(o.status)}</span></div>`).join("")}</div></div>
+    <div class="sec"><div class="eyebrow">Refunds issued</div><div class="list">
+      ${d.refunds.length ? d.refunds.map((r) => `<div class="kv"><b class="${Number(r.amount) > d.limit ? "red" : ""}">${esc(r.order_id)} · ${money(r.amount)}</b><span class="m">${esc(r.customer_id)}</span></div>`).join("") : '<span class="small">None yet</span>'}</div></div>
+    <div class="sec"><div class="eyebrow">Handed to a person</div><div class="list">
+      ${d.escalations.length ? d.escalations.map((t) => `<div class="small" style="color:var(--ink)"><b>${esc(t.customer_id)}</b> · ${esc(t.root_cause)}${t.amount != null ? " · " + money(t.amount) : ""}<div class="tiny">Next: ${esc(t.recommended_action)}</div></div>`).join("") : '<span class="small">No tickets</span>'}</div></div>
+    <div class="sec"><div class="eyebrow">Case facts · sent with every request</div><pre class="facts">${esc(d.facts)}</pre>
+      <div class="tiny" style="margin-top:6px">${d.messages} messages in the conversation Claude sees.</div></div>
+    ${d.breaks.length ? `<div class="sec"><div class="eyebrow yellow">Waiting to break</div>${d.breaks.map((b) => `<div class="small">${esc(b[0])} · ${esc(b[1])}</div>`).join("")}</div>` : ""}`;
+  $("#add-btn").onclick = () => $("#add-form").classList.toggle("on");
+  $("#add-form").onsubmit = async (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    try { await api("/api/customer", { name: f.get("name"), email: f.get("email") }); document.activeElement.blur(); await poll(); } catch (err) { showCard({ title: "That customer wasn't added", body: err.message }); }
+  };
+}
+function renderMode() {
+  const live = STATE.mode === "live";
+  $("#m-practice").classList.toggle("on", !live);
+  $("#m-live").classList.toggle("on", live);
+  $("#m-live").disabled = !STATE.hasKey;
+  $("#m-live").title = STATE.hasKey ? "" : "Add ANTHROPIC_API_KEY to your project's .env file to use Live mode.";
+  $("#input").disabled = !live || busy;
+  $("#send").disabled = !live || busy;
+  $("#input").placeholder = live ? "Message support as the customer. Enter to send." : "Practice: pick a prompt on the left. Switch to Live to type your own.";
+  const b = $("#banner");
+  b.classList.toggle("on", STATE.stale || STATE.checking);
+  b.textContent = STATE.stale ? "Your code changed. The next message starts a fresh conversation with it." : "Checking which steps are built…";
+}
+
+const LABEL = { call: ["TOOL CALL", "var(--blue)"], result: ["RESULT", "var(--green)"], error: ["ERROR", "var(--red)"], hook: ["HOOK", "var(--yellow)"], handoff: ["TO A PERSON", "var(--yellow)"], backend_fail: ["BACKEND", "var(--red)"], model: ["CLAUDE", "var(--muted)"], broke: ["BROKEN", "var(--yellow)"] };
+function lineHtml(e) {
+  let v = "", cls = "", tag = "";
+  if (e.type === "call") { v = `${e.name} ${JSON.stringify(e.input)}`; }
+  else if (e.type === "result") { v = e.content; }
+  else if (e.type === "error") { v = e.content; cls = "err"; tag = e.data && e.data.errorCategory ? "Step 3" : ""; }
+  else if (e.type === "hook") { v = `${e.hook} stopped ${e.tool}: ${e.reason}`; cls = "hook"; tag = "Step 4"; }
+  else if (e.type === "handoff") { v = JSON.stringify(e.ticket); cls = "hook"; tag = "Step 5"; }
+  else if (e.type === "backend_fail") { v = `${e.op}: ${e.message}`; cls = "err"; }
+  else if (e.type === "model") { v = `stop_reason: ${e.stop_reason}${e.asks.length ? " · asks for " + e.asks.join(", ") : ""}${e.text && e.asks.length ? ` · also wrote "${e.text}"` : ""}`; tag = "Step 1"; }
+  else if (e.type === "broke") { v = `the next ${e.op} call${e.times > 1 ? "s" : ""} will ${e.kind === "timeout" ? "time out" : "be denied"}${e.times > 1 ? " (" + e.times + "×)" : ""}`; }
+  else return "";
+  const [k, color] = LABEL[e.type];
+  return `<div class="line ${cls}"><span class="k" style="color:${color}">${k}</span><span class="v">${esc(v)}</span>${tag ? `<span class="tag">${tag}</span>` : ""}</div>`;
+}
+function renderMsgs() {
+  const box = $("#msgs");
+  if (!turns.length) {
+    box.innerHTML = `<div class="note">Pick a prompt on the left${STATE && STATE.mode === "live" ? ", or type your own below" : ""}. Lines marked behind the scenes show what the customer never sees.</div>`;
+    return;
+  }
+  box.innerHTML = turns.map((t, i) => {
+    const parts = [`<div class="bubble me"><span class="who">CUSTOMER</span>${esc(t.user)}</div>`];
+    for (const e of t.events) {
+      if (e.type === "note") parts.push(`<div class="note">${esc(e.text)}</div>`);
+      else if (e.type === "agent") parts.push(`<div class="bubble"><span class="who">AGENT</span>${esc(e.text)}</div>`);
+      else if (e.type === "not_built") parts.push(`<div class="note yellow">Step ${esc(e.step)} isn't built yet: ${esc(e.message)}</div>`);
+      else if (e.type === "crash") parts.push(`<div class="line err"><span class="k" style="color:var(--red)">PYTHON</span><span class="v">${esc(e.error)}${e.where ? "\n" + esc(e.where) : ""}</span></div>`);
+      else if (e.type === "loop_limit") parts.push(`<div class="line err"><span class="k" style="color:var(--red)">LOOP CAP</span><span class="v">${esc(e.message || "LoopLimitError")}</span><span class="tag">Step 1</span></div>`);
+      else parts.push(lineHtml(e));
+    }
+    if (t.mode === "live") parts.push(`<button class="why" data-why="${i}">What just happened?</button>`);
+    return parts.join("");
+  }).join("");
+  const sc = box.parentElement; sc.scrollTop = sc.scrollHeight;
+}
+function showCard(c, { byClaude = false } = {}) {
+  const card = $("#card");
+  if (!c) { card.classList.remove("on"); return; }
+  const bad = /shouldn't|didn't|isn't built|stopped because|slipped|went through|trimmed away|raised|Money moved|got a refund for|was picked|can't tell/i.test(c.title);
+  card.className = "card on" + (bad ? " bad" : "");
+  const tasks = (c.tasks || []).join(" and ");
+  const refs = (c.lookAt || []).map((r) => refHtml(r.ref, r.what)).concat((c.refs || []).map((r) => refHtml(r)));
+  card.innerHTML = `
+    <div class="row"><div class="eyebrow ${bad ? "" : "y"}" style="flex:1">What just happened${c.step ? " · step " + esc(c.step) : ""}${tasks ? " · task" + ((c.tasks || []).length > 1 ? "s " : " ") + esc(tasks) : ""}</div><button class="link" id="card-x" aria-label="Close" style="color:var(--muted)">✕</button></div>
+    <h3>${esc(c.title)}</h3><p>${esc(c.body)}</p>${c.lesson ? `<p class="yellow">${esc(c.lesson)}</p>` : ""}
+    ${refs.length ? `<div class="refs"><span class="tiny"><b>Look at</b> (opens in VS Code)</span>${refs.join("")}</div>` : ""}
+    <div class="foot"><span class="grow">${byClaude ? "Explained by Claude from this conversation and the study notes." : ""}</span><button class="btn primary" id="card-ok">Got it</button></div>`;
+  $("#card-x").onclick = $("#card-ok").onclick = () => card.classList.remove("on");
+}
+
+async function run(fn) {
+  if (busy) return;
+  busy = true; renderMode();
+  try { await fn(); } catch (e) { showCard({ title: "That didn't work", body: e.message }); }
+  finally { busy = false; await poll(); }
+}
+async function sendTry(id) {
+  const t = CONTENT.steps.flatMap((s) => s.tries).find((x) => x.id === id);
+  await run(async () => {
+    const r = await api("/api/try", { id });
+    if (r.tools) return openTools(r.tools, r.explain);
+    turns.push(r.turn); renderMsgs();
+    document.querySelectorAll(".try").forEach((b) => b.classList.toggle("on", b.dataset.try === id));
+    showCard(r.explain[0]);
+  });
+}
+async function sendText() {
+  const text = $("#input").value.trim();
+  if (!text) return;
+  await run(async () => {
+    const r = await api("/api/send", { text });
+    $("#input").value = "";
+    turns.push(r.turn); renderMsgs();
+    if (r.explain.length) showCard(r.explain[0]);
+  });
+}
+async function whyTurn(i) {
+  const card = $("#card");
+  card.className = "card on"; card.innerHTML = `<div class="eyebrow y">What just happened</div><p class="small">Claude is reading this turn…</p>`;
+  try { const r = await api("/api/explain", { turn: i, step }); showCard({ ...r, step }, { byClaude: true }); }
+  catch (e) { showCard({ title: "Claude couldn't explain this one", body: e.message }); }
+}
+function openDrawer(html) { $("#drawer").innerHTML = html; $("#drawer").classList.add("on"); $("#scrim").classList.add("on"); }
+function closeDrawer() { $("#drawer").classList.remove("on"); $("#scrim").classList.remove("on"); }
+function openTools(tools, ex) {
+  const checks = (t) => {
+    const d = t.description, other = t.name === "get_customer" ? "lookup_order" : t.name === "lookup_order" ? "get_customer" : null;
+    const c = [["250+ characters", d.length >= 250]];
+    if (t.name === "get_customer") c.push(["C- format", d.includes("C-")], ["several matches", /more than one|multiple/i.test(d)]);
+    if (t.name === "lookup_order") c.push(["O- format", d.includes("O-")], ["no orders", /no orders|empty/i.test(d)]);
+    if (other) c.push([`points to ${other}`, d.includes(other)]);
+    return c.map(([l, ok]) => `<span class="chip ${ok ? "ok" : "no"}">${ok ? "✓" : "✗"} ${esc(l)}</span>`).join("");
+  };
+  openDrawer(`<div style="padding:22px 26px 14px"><div class="row"><div class="eyebrow y" style="flex:1">Step 2 · task 2.1 · what Claude reads</div><button class="link" onclick="closeDrawer()" style="color:var(--muted)">✕</button></div>
+    <h2>Your tool descriptions</h2><p class="small">${esc(ex.body)}</p>${ex.refs.length ? refHtml(ex.refs[0]) : ""}</div>
+    <div class="scroll">${tools.map((t) => `<div class="tooldesc"><div class="m">${esc(t.name)} <span class="tiny">· ${t.description.length} characters</span></div><p style="margin:6px 0">${esc(t.description)}</p><div class="chips">${checks(t)}</div></div>`).join("")}</div>`);
+}
+async function runTests() {
+  openDrawer(`<div style="padding:22px 26px"><div class="eyebrow y">Step ${step}</div><h2>Running the tests…</h2></div>`);
+  try {
+    const r = await api("/api/tests", { step });
+    const s = CONTENT.steps.find((x) => x.n === step);
+    openDrawer(`<div style="padding:22px 26px 14px"><div class="row"><div class="eyebrow y" style="flex:1">Step ${step} · ${esc(s.title)} · task${s.tasks.length > 1 ? "s" : ""} ${esc(s.tasks.join(" and "))}</div><button class="link" onclick="closeDrawer()" style="color:var(--muted)">✕</button></div>
+      <h2>${r.passed} of ${r.total} tests pass</h2><p class="small">Each test is one thing the step must do. ${r.passed < r.total ? "For each red one: what it checks, what happened, where to look, and a prompt to try." : "Every one passes. Commit and push so they run on GitHub too."}</p></div>
+      <div class="scroll">${r.tests.map((t) => `<div class="test ${t.passed ? "" : "fail"}"><div class="h"><span class="dot" style="background:${t.passed ? "var(--green)" : "var(--red)"}"></span><b>${esc(t.title)}</b><span class="tiny" style="font-weight:700;color:${t.passed ? "var(--green)" : "var(--red)"}">${t.passed ? "Passed" : "Failed"}</span></div>
+        ${t.passed ? "" : `<div class="d"><div><div class="tiny">What it checks</div>${esc(t.checks || "")}</div><div><div class="tiny">What happened</div>${esc(t.message || "")}</div>${t.ref ? `<div><div class="tiny">Where to look</div>${refHtml(t.ref)}</div>` : ""}${t.ask ? `<div><div class="tiny">Try asking Claude Code</div><div class="ask"><span>“${esc(t.ask)}”</span><button class="link" data-copy="${esc(t.ask)}">Copy</button></div></div>` : ""}</div>`}</div>`).join("")}</div>
+      <div class="row" style="padding:16px 26px;border-top:1px solid var(--hair)"><span class="tiny" style="flex:1;font-family:var(--mono)">Ran ${esc(r.files.join(", "))} · ${r.took} s</span><button class="btn primary" onclick="runTests()">Run again</button></div>`);
+  } catch (e) {
+    openDrawer(`<div style="padding:22px 26px"><div class="row"><div class="eyebrow y" style="flex:1">Step ${step}</div><button class="link" onclick="closeDrawer()">✕</button></div><h2>The tests didn't run</h2><p class="small">${esc(e.message)}</p></div>`);
+  }
+}
+
+async function poll() {
+  try {
+    STATE = await api("/api/state");
+    if (step === null) {
+      const firstUnbuilt = CONTENT.steps.find((s) => STATE.built[s.n] === false);
+      step = firstUnbuilt ? firstUnbuilt.n : (Object.keys(STATE.built).length ? 6 : 1);
+      renderTries();
+    }
+    renderSteps(); renderData(); renderMode();
+  } catch { /* the next poll tries again */ }
+}
+
+document.addEventListener("click", (e) => {
+  const t = e.target.closest("[data-try]"); if (t) return sendTry(t.dataset.try);
+  const w = e.target.closest("[data-why]"); if (w) return whyTurn(Number(w.dataset.why));
+  const b = e.target.closest("[data-break]");
+  if (b) return run(async () => { await api("/api/break", { op: $("#break-op").value, kind: b.dataset.break }); $("#break-note").textContent = `Next ${$("#break-op").value} call will ${b.dataset.break === "timeout" ? "time out" : "be denied"}. Now send a message that uses it.`; });
+  const c = e.target.closest("[data-copy]");
+  if (c) { navigator.clipboard?.writeText(c.dataset.copy); c.textContent = "Copied"; setTimeout(() => (c.textContent = "Copy"), 1500); }
+});
+$("#scrim").onclick = closeDrawer;
+$("#step").onchange = (e) => { step = Number(e.target.value); renderTries(); };
+$("#m-practice").onclick = () => run(async () => { await api("/api/mode", { mode: "practice" }); turns = []; renderMsgs(); showCard(null); });
+$("#m-live").onclick = () => run(async () => { await api("/api/mode", { mode: "live" }); turns = []; renderMsgs(); showCard(null); });
+$("#reset").onclick = () => run(async () => { await api("/api/reset", { mode: STATE?.mode }); turns = []; renderMsgs(); showCard(null); });
+$("#run-tests").onclick = runTests;
+$("#send").onclick = sendText;
+$("#input").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendText(); } });
+$("#bts").onchange = (e) => $("#msgs").classList.toggle("hidebts", !e.target.checked);
+
+(async () => {
+  CONTENT = await api("/api/content");
+  await poll();
+  renderMsgs();
+  setInterval(() => { if (!busy) poll(); }, 3000);
+})();
+</script>
+</body>
+</html>

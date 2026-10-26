@@ -1,0 +1,802 @@
+{
+  "refs": {
+    "loop": [
+      "src/support_agent/loop.py",
+      "^def run_agent"
+    ],
+    "loop_limit": [
+      "src/support_agent/loop.py",
+      "LoopLimitError\\("
+    ],
+    "tools": [
+      "src/support_agent/tools.py",
+      "^TOOLS"
+    ],
+    "tool_error": [
+      "src/support_agent/errors.py",
+      "^def tool_error"
+    ],
+    "toolbox_run": [
+      "src/support_agent/toolbox.py",
+      "def run\\("
+    ],
+    "refund_checks": [
+      "src/support_agent/toolbox.py",
+      "def _process_refund"
+    ],
+    "get_customer": [
+      "src/support_agent/toolbox.py",
+      "def _get_customer"
+    ],
+    "lookup_order": [
+      "src/support_agent/toolbox.py",
+      "def _lookup_order"
+    ],
+    "verified_first": [
+      "src/support_agent/hooks.py",
+      "^def verified_customer_first"
+    ],
+    "refund_limit": [
+      "src/support_agent/hooks.py",
+      "^def refund_limit"
+    ],
+    "limit_value": [
+      "src/support_agent/policy.py",
+      "^REFUND_LIMIT"
+    ],
+    "wants_human": [
+      "src/support_agent/escalation.py",
+      "^def wants_human"
+    ],
+    "handoff": [
+      "src/support_agent/escalation.py",
+      "^def build_handoff"
+    ],
+    "escalation_rules": [
+      "src/support_agent/escalation.py",
+      "^ESCALATION_RULES"
+    ],
+    "agent_handle": [
+      "src/support_agent/agent.py",
+      "def handle"
+    ],
+    "trim_order": [
+      "src/support_agent/context.py",
+      "^def trim_order"
+    ],
+    "facts_record": [
+      "src/support_agent/context.py",
+      "def record"
+    ],
+    "facts_render": [
+      "src/support_agent/context.py",
+      "def render"
+    ],
+    "compact": [
+      "src/support_agent/context.py",
+      "^def compact_history"
+    ],
+    "issue_rules": [
+      "src/support_agent/context.py",
+      "^ISSUE_RULES"
+    ]
+  },
+  "steps": [
+    {
+      "n": 1,
+      "title": "The agent loop",
+      "tasks": [
+        "1.1"
+      ],
+      "notBuilt": "The agent loop isn't written yet, so nothing can talk to Claude. Practice still shows what each prompt will do once it is.",
+      "tries": [
+        {
+          "id": "s1-simple",
+          "title": "A simple question",
+          "prompt": "I'm dana@example.com. Where's my order O-5001?",
+          "expect": "Your loop sends the question, runs get_customer and lookup_order, and stops when Claude says the turn is over."
+        },
+        {
+          "id": "s1-sounds-done",
+          "title": "Text that sounds finished",
+          "prompt": "I'm dana@example.com. Is order O-5001 here yet?",
+          "expect": "Claude writes \"All done!\" but still asks for a tool. A loop that reads the text stops too early; yours should keep going."
+        },
+        {
+          "id": "s1-two",
+          "title": "Two orders at once",
+          "prompt": "I'm dana@example.com. Where are O-5001 and O-5002?",
+          "expect": "Claude asks for two tools in one reply. Both results go back together, in one message."
+        }
+      ]
+    },
+    {
+      "n": 2,
+      "title": "Tools that say what they are for",
+      "tasks": [
+        "2.1"
+      ],
+      "notBuilt": "Your tool descriptions are still one line each. Claude picks tools by reading them, so thin ones lead to the wrong look-up.",
+      "liveOnly": true,
+      "tries": [
+        {
+          "id": "s2-read",
+          "title": "Read what Claude reads",
+          "prompt": "Open the tool descriptions",
+          "expect": "Claude sees only these words when it chooses a tool. Check each says what it's for, its input formats, edge cases, and when to use the other look-up instead.",
+          "action": "tools"
+        },
+        {
+          "id": "s2-live-orders",
+          "title": "Which look-up does it pick? (Live)",
+          "prompt": "What orders does dana@example.com have?",
+          "expect": "In Live, watch which tool Claude calls first. With good descriptions it verifies with get_customer, then lists orders with lookup_order.",
+          "live": true
+        },
+        {
+          "id": "s2-live-name",
+          "title": "A name, not an email (Live)",
+          "prompt": "Hi, it's Dana Ortiz. Can you check my last order?",
+          "expect": "Two customers share that name. A description that mentions several matches leads Claude to ask which one.",
+          "live": true
+        }
+      ]
+    },
+    {
+      "n": 3,
+      "title": "Errors the agent can act on",
+      "tasks": [
+        "2.2"
+      ],
+      "notBuilt": "Every failure still comes back as \"Operation failed\", so the agent can't tell a timeout from a refusal.",
+      "tries": [
+        {
+          "id": "s3-where",
+          "title": "Where's my order?",
+          "prompt": "Hi, I'm sam@example.com. Where's my phone case, order O-5003?",
+          "expect": "Works either way: the tools answer."
+        },
+        {
+          "id": "s3-timeout",
+          "title": "One timeout",
+          "prompt": "Hi, I'm sam@example.com. Where's order O-5003?",
+          "break": [
+            "lookup_order",
+            "timeout",
+            1
+          ],
+          "expect": "The order system times out once. Before: Claude gets \"Operation failed\". After: your tool retries quietly and Claude never sees the hiccup."
+        },
+        {
+          "id": "s3-down",
+          "title": "The order system is down",
+          "prompt": "Hi, I'm sam@example.com. Where's order O-5003?",
+          "break": [
+            "lookup_order",
+            "timeout",
+            6
+          ],
+          "expect": "It keeps timing out. After: a transient, retryable error, so Claude tries once more and then tells the customer plainly."
+        },
+        {
+          "id": "s3-refusal",
+          "title": "A refund the policy refuses",
+          "prompt": "Hi, I'm sam@example.com. Please refund my desk lamp, order O-5004.",
+          "expect": "It was delivered in July, outside the 30-day window. After: a business error with words for the customer, and no retry."
+        },
+        {
+          "id": "s3-bad-id",
+          "title": "A badly formed order number",
+          "prompt": "Hi, I'm sam@example.com. Where's order 5003?",
+          "expect": "After: a validation error, so Claude asks for a number like O-5003 instead of guessing."
+        },
+        {
+          "id": "s3-two-danas",
+          "title": "Two customers, one name",
+          "prompt": "Hi, it's Dana Ortiz.",
+          "expect": "Two Dana Ortizes exist. After: both come back and Claude asks which one; it never picks."
+        }
+      ]
+    },
+    {
+      "n": 4,
+      "title": "A refund limit in code",
+      "tasks": [
+        "1.5",
+        "1.4"
+      ],
+      "notBuilt": "The $500 limit and the ID check are only written in the prompt, so nothing in code stops a refund that breaks them.",
+      "tries": [
+        {
+          "id": "s4-under",
+          "title": "Under the limit",
+          "prompt": "I'm dana@example.com. My headphones (O-5001) broke, can I get a refund?",
+          "expect": "Works either way: $120 is under the $500 limit."
+        },
+        {
+          "id": "s4-over",
+          "title": "Over the limit",
+          "prompt": "I'm dana@example.com. Please refund my laptop, order O-5002.",
+          "expect": "Before: the $640 refund goes through. After: your hook blocks it and hands it to a person."
+        },
+        {
+          "id": "s4-no-id",
+          "title": "No ID check",
+          "prompt": "Refund order O-5001, please.",
+          "expect": "Nobody has said who they are. After: the hook refuses until get_customer has verified the customer."
+        },
+        {
+          "id": "s4-someone-else",
+          "title": "Someone else's order",
+          "prompt": "I'm dana@example.com. Refund order O-5003 for me.",
+          "expect": "O-5003 is Sam's. After: the hook blocks a refund for a customer other than the verified one."
+        }
+      ]
+    },
+    {
+      "n": 5,
+      "title": "Handing off to a person",
+      "tasks": [
+        "5.2",
+        "1.4"
+      ],
+      "notBuilt": "A request for a person isn't recognized yet, and a handoff can go out with parts missing.",
+      "tries": [
+        {
+          "id": "s5-human",
+          "title": "Ask for a person",
+          "prompt": "Can I talk to a human, please?",
+          "expect": "After: handed to a person straight away, before Claude is even asked."
+        },
+        {
+          "id": "s5-frustrated",
+          "title": "Frustrated, but it's solvable",
+          "prompt": "This is ridiculous, my headphones broke! I'm dana@example.com, order O-5001.",
+          "expect": "Frustration alone isn't a request for a person. The agent solves it: a $120 refund."
+        },
+        {
+          "id": "s5-over",
+          "title": "A handoff a person can act on",
+          "prompt": "I'm dana@example.com. Please refund my laptop, order O-5002.",
+          "expect": "Blocked by the step 4 hook and sent to a person. Check the ticket on the right: customer, root cause, amount, recommended action, summary."
+        }
+      ]
+    },
+    {
+      "n": 6,
+      "title": "Long, messy conversations",
+      "tasks": [
+        "1.6",
+        "5.1"
+      ],
+      "notBuilt": "The exact facts (order numbers, amounts, dates) aren't kept anywhere yet, so they're lost when the chat grows or is trimmed.",
+      "tries": [
+        {
+          "id": "s6-several",
+          "title": "Several problems at once",
+          "prompt": "I'm dana@example.com. My headphones (O-5001) broke and where's my laptop, O-5002?",
+          "expect": "Two problems, handled one by one and answered together. Watch the case facts fill in on the right."
+        },
+        {
+          "id": "s6-recall",
+          "title": "A long chat, then a detail",
+          "prompt": "(12 turns of small talk), then: What did my laptop cost?",
+          "expect": "The early turns are trimmed away. After: the exact $640.00 survives in the case facts at the top of every request."
+        }
+      ]
+    }
+  ],
+  "explain": {
+    "not_built": {
+      "title": "This step isn't built yet",
+      "body": "{notBuilt} Ask Claude Code for /cca-prep-studio:next-step to build it, then send this again.",
+      "ref": null
+    },
+    "crash": {
+      "title": "Your code raised an error",
+      "body": "Python stopped with {error}. The console shows where. Fix it with Claude Code, then send again.",
+      "ref": null
+    },
+    "s1_ran": {
+      "title": "Your loop drove the whole turn",
+      "step": 1,
+      "tasks": [
+        "1.1"
+      ],
+      "body": "Each time Claude asked for a tool, your loop ran it, sent the result back and called Claude again. It stopped only when stop_reason said end_turn. That loop is the engine every later step builds on.",
+      "ref": "loop"
+    },
+    "s1_stopped_early": {
+      "title": "The loop stopped because the text sounded finished",
+      "step": 1,
+      "tasks": [
+        "1.1"
+      ],
+      "body": "Claude wrote \"All done!\" but its stop_reason was tool_use: it still wanted lookup_order. Deciding from the words ended the turn with a tool unrun. Decide from stop_reason only.",
+      "ref": "loop"
+    },
+    "s1_kept_going": {
+      "title": "\"All done!\", and your loop kept going",
+      "step": 1,
+      "tasks": [
+        "1.1"
+      ],
+      "body": "The reply said \"All done!\" but stop_reason was tool_use, so your loop ran the tool and asked again. Words can sound finished while Claude still needs something; the stop reason is the only signal to trust.",
+      "ref": "loop"
+    },
+    "s1_parallel": {
+      "title": "Two tools, one message back",
+      "step": 1,
+      "tasks": [
+        "1.1"
+      ],
+      "body": "Claude asked for two look-ups in one reply. Your loop ran both and returned both results together, each with the tool_use_id it answers, in the same order.",
+      "ref": "loop"
+    },
+    "loop_limit": {
+      "title": "The safety cap stopped the loop",
+      "step": 1,
+      "tasks": [
+        "1.1"
+      ],
+      "body": "The loop hit max_iterations and raised LoopLimitError. The cap is a backstop for a runaway turn, never the normal way to finish.",
+      "ref": "loop_limit"
+    },
+    "s2_tools": {
+      "title": "This is all Claude reads to choose a tool",
+      "step": 2,
+      "tasks": [
+        "2.1"
+      ],
+      "body": "Claude can't see your code, only these names and descriptions. Say what each tool is for, the input formats (C-1234, O-1234), what comes back, the edge cases, and when to use the other look-up instead.",
+      "ref": "tools"
+    },
+    "s3_generic": {
+      "title": "\"Operation failed\": Claude can't tell what went wrong",
+      "step": 3,
+      "tasks": [
+        "2.2"
+      ],
+      "body": "Every failure looks the same right now, so Claude can't tell a timeout (try again) from a bad order number (ask for the right one) from a refusal (explain it). Step 3 gives each error a category, a retryable flag and a plain message.",
+      "ref": "tool_error"
+    },
+    "s3_retried_inside": {
+      "title": "A timeout, handled before Claude ever saw it",
+      "step": 3,
+      "tasks": [
+        "2.2"
+      ],
+      "body": "The order system timed out, and your tool tried again on its own and got the answer. A short hiccup is best fixed where it happens; only a failure that keeps going should reach Claude.",
+      "ref": "toolbox_run"
+    },
+    "s3_transient": {
+      "title": "Still timing out: a retryable error reached Claude",
+      "step": 3,
+      "tasks": [
+        "2.2"
+      ],
+      "body": "After its own retries, your tool returned errorCategory transient with isRetryable true. That told Claude a later try could work, so it tried once more, then told the customer plainly instead of guessing.",
+      "ref": "tool_error"
+    },
+    "s3_business": {
+      "title": "A refusal Claude explains, and doesn't retry",
+      "step": 3,
+      "tasks": [
+        "2.2"
+      ],
+      "body": "The policy said no: a business error with isRetryable false and a customerMessage. Retrying could never change the answer, so Claude passed the explanation on instead.",
+      "ref": "refund_checks"
+    },
+    "s3_validation": {
+      "title": "A bad input: ask, don't retry",
+      "step": 3,
+      "tasks": [
+        "2.2"
+      ],
+      "body": "The order number wasn't in the O-1234 format. A validation error says the input is wrong, so the fix is a better input from the customer, not the same call again.",
+      "ref": "lookup_order"
+    },
+    "s3_permission": {
+      "title": "Not allowed: no retry",
+      "step": 3,
+      "tasks": [
+        "2.2"
+      ],
+      "body": "A permission error means this account may not do it. Trying again won't help; the agent explains or offers a person.",
+      "ref": "tool_error"
+    },
+    "s3_matches": {
+      "title": "Two customers, one name: Claude asks",
+      "step": 3,
+      "tasks": [
+        "2.2"
+      ],
+      "body": "Your tool returned every match instead of picking one, so Claude asked which account is theirs. Picking the first match could show one Dana another Dana's orders.",
+      "ref": "get_customer"
+    },
+    "s3_picked_one": {
+      "title": "Two customers matched, and one was picked",
+      "step": 3,
+      "tasks": [
+        "2.2"
+      ],
+      "body": "Two customers are called Dana Ortiz, and the tool quietly returned the first. Return every match so the agent asks; never guess whose account it is.",
+      "ref": "get_customer"
+    },
+    "s3_refund_slipped": {
+      "title": "A refund the policy should have refused went through",
+      "step": 3,
+      "tasks": [
+        "2.2"
+      ],
+      "body": "The desk lamp was delivered in July, outside the 30-day window, but nothing checked. Step 3 makes the refund tool refuse with a business error and words for the customer.",
+      "ref": "refund_checks"
+    },
+    "s4_over_passed": {
+      "title": "A refund over the limit went through. It shouldn't have.",
+      "step": 4,
+      "tasks": [
+        "1.5",
+        "1.4"
+      ],
+      "body": "The $500 limit is only written in the prompt, and a prompt is followed most of the time, not every time. Step 4 adds a hook: code that runs before every tool call, stops a refund over the limit, and hands it to a person.",
+      "ref": "refund_limit"
+    },
+    "s4_over_blocked": {
+      "title": "Your hook stopped the refund and called a person",
+      "step": 4,
+      "tasks": [
+        "1.5",
+        "1.4"
+      ],
+      "body": "The refund was over $500, so your hook blocked it before the backend ran it and sent a handoff to a person instead. A rule in code holds every time; a rule in the prompt only usually does.",
+      "ref": "refund_limit"
+    },
+    "s4_unverified_passed": {
+      "title": "Money moved before anyone was verified",
+      "step": 4,
+      "tasks": [
+        "1.5",
+        "1.4"
+      ],
+      "body": "No get_customer call came first, yet the refund ran. The prompt asks for verification, but only a hook can guarantee it happens before an order look-up or refund.",
+      "ref": "verified_first"
+    },
+    "s4_unverified_blocked": {
+      "title": "Verify first: your hook said no",
+      "step": 4,
+      "tasks": [
+        "1.5",
+        "1.4"
+      ],
+      "body": "Nobody had been verified, so your hook refused the call. Claude then asked who the customer is, which is the order of steps the business needs.",
+      "ref": "verified_first"
+    },
+    "s4_other_passed": {
+      "title": "Dana got a refund for Sam's order",
+      "step": 4,
+      "tasks": [
+        "1.5",
+        "1.4"
+      ],
+      "body": "The verified customer was Dana, but the refund was for Sam's order. A hook should allow refunds only for the customer who was verified.",
+      "ref": "verified_first"
+    },
+    "s4_other_blocked": {
+      "title": "Someone else's order: blocked",
+      "step": 4,
+      "tasks": [
+        "1.5",
+        "1.4"
+      ],
+      "body": "The refund named a customer other than the verified one, so your hook refused it.",
+      "ref": "verified_first"
+    },
+    "s5_now": {
+      "title": "Handed to a person straight away",
+      "step": 5,
+      "tasks": [
+        "5.2",
+        "1.4"
+      ],
+      "body": "The customer asked for a person, so your code honored it at once, before Claude was even called. An explicit request isn't something to investigate first.",
+      "ref": "wants_human"
+    },
+    "s5_missed": {
+      "title": "They asked for a person and didn't get one",
+      "step": 5,
+      "tasks": [
+        "5.2",
+        "1.4"
+      ],
+      "body": "\"Can I talk to a human?\" wasn't recognized, so the agent carried on by itself. Step 5 teaches wants_human to spot an explicit request and hand off straight away.",
+      "ref": "wants_human"
+    },
+    "s5_solved": {
+      "title": "Frustrated, but solved without a handoff",
+      "step": 5,
+      "tasks": [
+        "5.2",
+        "1.4"
+      ],
+      "body": "Frustration alone isn't a request for a person. The issue was solvable, so the agent solved it. Handing off every upset customer would bury the team.",
+      "ref": "escalation_rules"
+    },
+    "s5_ticket": {
+      "title": "A handoff a person can act on",
+      "step": 5,
+      "tasks": [
+        "5.2",
+        "1.4"
+      ],
+      "body": "The ticket carries the customer, the root cause, the amount, a recommended action and a summary, so a person can act without reading the transcript.",
+      "ref": "handoff"
+    },
+    "s6_facts": {
+      "title": "The exact facts ride along with every request",
+      "step": 6,
+      "tasks": [
+        "1.6",
+        "5.1"
+      ],
+      "body": "Your case facts hold the order numbers, amounts and dates exactly as the tools returned them, at the top of the system prompt on every request. Trimming old turns can't lose them.",
+      "ref": "facts_render"
+    },
+    "s6_forgot": {
+      "title": "The detail was trimmed away",
+      "step": 6,
+      "tasks": [
+        "1.6",
+        "5.1"
+      ],
+      "body": "The early turns that held $640.00 were dropped to keep the chat short, and nothing kept the fact. Step 6 records exact facts as tools return them and puts them in every request.",
+      "ref": "facts_record"
+    },
+    "s6_growing": {
+      "title": "It remembered, because nothing is ever trimmed",
+      "step": 6,
+      "tasks": [
+        "1.6",
+        "5.1"
+      ],
+      "body": "The whole chat, {kept} messages so far, goes to Claude on every request, so the price was still there. That only works until the conversation is too long. Step 6 trims old turns and keeps the exact facts on their own, so they survive the trimming.",
+      "ref": "compact"
+    }
+  },
+  "tests": {
+    "test_runs_the_tool_then_stops_on_end_turn": {
+      "title": "Runs the tool, then stops on end_turn",
+      "checks": "The loop runs the tool Claude asks for, calls Claude again, and stops when stop_reason is end_turn.",
+      "ref": "loop",
+      "ask": "Make run_agent run the requested tool, call Claude again, and stop only on end_turn. Show me the lines that decide when to stop."
+    },
+    "test_tool_result_goes_back_with_the_matching_id": {
+      "title": "Each result goes back with its tool's id",
+      "checks": "Claude's reply (with its tool_use) is kept, and the result comes back as a tool_result with the same tool_use_id.",
+      "ref": "loop",
+      "ask": "Keep Claude's full reply in messages and send each result back as a tool_result with the matching tool_use_id."
+    },
+    "test_keeps_going_when_text_sounds_finished_but_stop_reason_is_tool_use": {
+      "title": "Keeps going when the text sounds finished",
+      "checks": "A reply that says \"All done!\" but has stop_reason tool_use still gets its tool run.",
+      "ref": "loop",
+      "ask": "Make the loop decide only from stop_reason, never from the reply's text."
+    },
+    "test_several_tool_calls_come_back_in_one_message": {
+      "title": "Several results come back in one message",
+      "checks": "Two tool calls in one reply come back as two tool_results in one user message, in order.",
+      "ref": "loop",
+      "ask": "When Claude asks for several tools at once, run them all and return every result in one message, in order."
+    },
+    "test_errors_are_marked_as_errors": {
+      "title": "Failed tools are marked is_error",
+      "checks": "A failed tool's result carries is_error: true so Claude knows it failed.",
+      "ref": "loop",
+      "ask": "Pass each outcome's is_error through on its tool_result."
+    },
+    "test_the_cap_is_a_safety_net_that_raises": {
+      "title": "The cap raises LoopLimitError",
+      "checks": "After max_iterations rounds the loop raises LoopLimitError instead of returning quietly.",
+      "ref": "loop",
+      "ask": "After max_iterations rounds, raise LoopLimitError."
+    },
+    "test_the_system_prompt_is_rebuilt_on_every_request": {
+      "title": "The system prompt is rebuilt every request",
+      "checks": "When system is a function, it's called before every request.",
+      "ref": "loop",
+      "ask": "If system is callable, call it before each request so it's rebuilt every time."
+    },
+    "test_the_four_tools_exist_with_schemas": {
+      "title": "The four tools exist with schemas",
+      "checks": "get_customer, lookup_order, process_refund and escalate_to_human each have an object input schema.",
+      "ref": "tools",
+      "ask": "Check TOOLS has the four tools, each with an object input_schema."
+    },
+    "test_descriptions_are_more_than_a_line": {
+      "title": "Each description is more than a line",
+      "checks": "Every description is at least 250 characters: purpose, inputs and formats, what comes back, edge cases, when to use it.",
+      "ref": "tools",
+      "ask": "Rewrite each tool description to say what it does, its inputs and formats, what it returns, edge cases, and when to use it."
+    },
+    "test_the_look_ups_point_at_each_other": {
+      "title": "The two look-ups point at each other",
+      "checks": "get_customer says when to use lookup_order instead, and the other way round.",
+      "ref": "tools",
+      "ask": "Make get_customer's description say when to use lookup_order instead, and lookup_order's say when to use get_customer."
+    },
+    "test_input_formats_are_described": {
+      "title": "Input formats are described",
+      "checks": "The descriptions show the C- and O- ID formats.",
+      "ref": "tools",
+      "ask": "Mention the ID formats (C-1234, O-1234) in the descriptions."
+    },
+    "test_edge_cases_are_described": {
+      "title": "Edge cases are described",
+      "checks": "get_customer says what happens with several matches; lookup_order says what no orders looks like.",
+      "ref": "tools",
+      "ask": "Describe the edge cases: several matching customers, and a customer with no orders."
+    },
+    "test_refund_requires_everything_it_needs": {
+      "title": "A refund needs everything it needs",
+      "checks": "process_refund requires customer_id, order_id and amount.",
+      "ref": "tools",
+      "ask": "Make customer_id, order_id and amount required for process_refund."
+    },
+    "test_the_handoff_asks_for_what_a_person_needs": {
+      "title": "The handoff asks for what a person needs",
+      "checks": "escalate_to_human requires customer_id, root_cause and recommended_action.",
+      "ref": "tools",
+      "ask": "Require customer_id, root_cause and recommended_action on escalate_to_human."
+    },
+    "test_a_badly_formed_order_id_is_a_validation_error": {
+      "title": "A badly formed order ID is a validation error",
+      "checks": "Order \"12345\" returns errorCategory validation with isRetryable false.",
+      "ref": "lookup_order",
+      "ask": "Check the order ID format in lookup_order and return a validation error that isn't retryable."
+    },
+    "test_a_timeout_is_retried_before_giving_up": {
+      "title": "One timeout is retried inside the tool",
+      "checks": "A single timeout is retried in the tool, and the look-up then succeeds.",
+      "ref": "toolbox_run",
+      "ask": "Retry a BackendTimeout inside the toolbox before returning an error."
+    },
+    "test_a_timeout_that_keeps_happening_is_transient_and_retryable": {
+      "title": "A timeout that keeps happening is transient",
+      "checks": "When retries run out, the error is transient with isRetryable true.",
+      "ref": "toolbox_run",
+      "ask": "When timeouts keep happening after the retries, return a transient, retryable error."
+    },
+    "test_a_policy_refusal_is_a_business_error_with_words_for_the_customer": {
+      "title": "A policy refusal is a business error",
+      "checks": "A refund outside the return window is a business error, not retryable, with a customerMessage, and no refund happens.",
+      "ref": "refund_checks",
+      "ask": "In _process_refund, refuse orders outside the return window with a business error and a sentence for the customer."
+    },
+    "test_permission_errors_are_not_retried": {
+      "title": "Permission errors aren't retried",
+      "checks": "A denied call returns errorCategory permission with isRetryable false.",
+      "ref": "toolbox_run",
+      "ask": "Turn BackendDenied into a permission error that isn't retryable."
+    },
+    "test_no_orders_is_an_answer_not_an_error": {
+      "title": "No orders is an answer, not an error",
+      "checks": "A customer with no orders gets an empty list, not an error.",
+      "ref": "lookup_order",
+      "ask": "Return an empty orders list, not an error, for a customer with no orders."
+    },
+    "test_several_matching_customers_are_all_returned": {
+      "title": "Every matching customer comes back",
+      "checks": "\"Dana Ortiz\" returns both matches so the agent asks; it never picks one.",
+      "ref": "get_customer",
+      "ask": "When a name matches several customers, return them all as matches with a note to ask for the email or ID."
+    },
+    "test_a_good_refund_works": {
+      "title": "A good refund still works",
+      "checks": "A refund inside the window and the order total goes through.",
+      "ref": "refund_checks",
+      "ask": "Make sure a valid refund still goes through after the new checks."
+    },
+    "test_a_refund_over_the_limit_never_reaches_the_backend": {
+      "title": "A refund over the limit never runs",
+      "checks": "A $640 refund is stopped by a hook before the backend sees it.",
+      "ref": "refund_limit",
+      "ask": "Write the refund_limit hook so a refund over REFUND_LIMIT is blocked before it runs."
+    },
+    "test_a_blocked_refund_goes_to_a_person": {
+      "title": "A blocked refund goes to a person",
+      "checks": "The blocked refund becomes one escalation with the customer and the amount.",
+      "ref": "refund_limit",
+      "ask": "Redirect a blocked refund to escalate_to_human with a full handoff."
+    },
+    "test_a_refund_within_the_limit_goes_through": {
+      "title": "A refund within the limit goes through",
+      "checks": "A $120 refund for the verified customer is allowed.",
+      "ref": "refund_limit",
+      "ask": "Make sure refunds under the limit still pass the hooks."
+    },
+    "test_no_refund_before_the_customer_is_verified": {
+      "title": "No refund before verification",
+      "checks": "A refund before get_customer is refused, not retryable.",
+      "ref": "verified_first",
+      "ask": "Write verified_customer_first so a refund is refused until get_customer has verified that customer."
+    },
+    "test_no_order_lookup_before_the_customer_is_verified": {
+      "title": "No order look-up before verification",
+      "checks": "Looking up an order before get_customer is refused.",
+      "ref": "verified_first",
+      "ask": "Make verified_customer_first block lookup_order until a customer is verified."
+    },
+    "test_a_refund_for_a_different_customer_is_blocked": {
+      "title": "No refund for someone else's order",
+      "checks": "With Dana verified, a refund for Sam is blocked.",
+      "ref": "verified_first",
+      "ask": "Block a refund whose customer isn't the verified one."
+    },
+    "test_explicit_requests_for_a_person": {
+      "title": "Spots a request for a person",
+      "checks": "\"Talk to a human\", \"get me a manager\" and similar are recognized.",
+      "ref": "wants_human",
+      "ask": "Make wants_human return true for an explicit request for a person."
+    },
+    "test_frustration_alone_is_not_a_request_for_a_person": {
+      "title": "Frustration alone isn't a request",
+      "checks": "Angry messages without asking for a person aren't treated as one.",
+      "ref": "wants_human",
+      "ask": "Make sure wants_human stays false for frustration without a request for a person."
+    },
+    "test_asking_for_a_person_escalates_straight_away": {
+      "title": "A request for a person escalates at once",
+      "checks": "Asking for a manager creates one escalation and Claude isn't even called.",
+      "ref": "agent_handle",
+      "ask": "Show me how agent.handle uses wants_human to hand off before calling Claude."
+    },
+    "test_a_handoff_has_what_a_person_needs": {
+      "title": "A handoff has what a person needs",
+      "checks": "build_handoff keeps all five fields and refuses an empty root cause.",
+      "ref": "handoff",
+      "ask": "Make build_handoff raise ValueError when a required field is empty."
+    },
+    "test_the_prompt_has_criteria_and_examples": {
+      "title": "The prompt says when to escalate, with examples",
+      "checks": "ESCALATION_RULES has criteria, at least two examples, frustration and several-matches guidance.",
+      "ref": "escalation_rules",
+      "ask": "Write ESCALATION_RULES with when to escalate and when not to, two examples, and what to do for frustration and several matches."
+    },
+    "test_order_results_are_trimmed_to_what_the_case_needs": {
+      "title": "Order results are trimmed",
+      "checks": "Tracking numbers and internal notes are dropped; ID, amount and status stay.",
+      "ref": "trim_order",
+      "ask": "Make trim_order keep only ORDER_FIELDS."
+    },
+    "test_case_facts_keep_exact_numbers": {
+      "title": "Case facts keep exact numbers",
+      "checks": "The facts block lists C-1001, O-5002 and $640.00 exactly.",
+      "ref": "facts_record",
+      "ask": "Record the verified customer and every order in CaseFacts, and render amounts like $640.00."
+    },
+    "test_the_facts_go_with_every_request": {
+      "title": "The facts go with every request",
+      "checks": "The third request's system prompt holds O-5002 and $640.00.",
+      "ref": "facts_render",
+      "ask": "Show me where the case facts are put into the system prompt on each request."
+    },
+    "test_compacting_the_history_never_starts_on_an_orphan_tool_result": {
+      "title": "Trimming never leaves an orphan result",
+      "checks": "The shortened history never starts on a tool_result whose tool_use was dropped.",
+      "ref": "compact",
+      "ask": "Write compact_history so it keeps the last turns and never starts on a tool_result without its tool_use."
+    },
+    "test_facts_survive_compaction": {
+      "title": "Facts survive trimming",
+      "checks": "After trimming the chat, $120.00 is still in the facts.",
+      "ref": "facts_render",
+      "ask": "Make sure trimming the history doesn't touch the case facts."
+    },
+    "test_the_prompt_says_how_to_handle_several_problems": {
+      "title": "The prompt handles several problems",
+      "checks": "ISSUE_RULES says to take each problem separately and answer together.",
+      "ref": "issue_rules",
+      "ask": "Write ISSUE_RULES: list each problem, work on each separately, and answer them together."
+    }
+  }
+}
