@@ -1,7 +1,7 @@
 {
   "name": "cca-prep-studio",
   "displayName": "CCA Prep Studio",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Coaches you through a CCA Prep Studio capstone one step at a time, in your coaching style, and reports finished steps to your Workbook.",
   "author": { "name": "NovaLinQs" },
   "homepage": "https://www.ccaprepstudio.com/capstones",
